@@ -13,8 +13,10 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
@@ -23,7 +25,7 @@ import java.io.IOException;
 import java.util.Properties;
 
 public class Main {
-
+    private static volatile boolean coverMode = true;
     static JFrame wallpaperFrame;
     static JPanel wallpaperPanel;
     static JLabel imageLabel;
@@ -123,15 +125,20 @@ public class Main {
         if (SystemTray.isSupported()) {
             PopupMenu popup = new PopupMenu();
 
+            CheckboxMenuItem coverModeItem = new CheckboxMenuItem("Cover Mode");
+            coverModeItem.setState(true);
+            coverModeItem.addItemListener(e -> coverMode = coverModeItem.getState());
+
             MenuItem changeWallpaperItem = new MenuItem("Change Wallpaper");
-            changeWallpaperItem.addActionListener(e -> selectAndSetWallpaper());
+            changeWallpaperItem.addActionListener((ActionEvent e) -> selectAndSetWallpaper());
 
             MenuItem exitItem = new MenuItem("Exit");
-            exitItem.addActionListener(e -> {
+            exitItem.addActionListener((ActionEvent e) -> {
                 wallpaperFrame.dispose();
                 System.exit(0);
             });
 
+            popup.add(coverModeItem);
             popup.add(changeWallpaperItem);
             popup.add(exitItem);
 
@@ -144,6 +151,7 @@ public class Main {
                 e.printStackTrace();
             }
         }
+
     }
 
     private static void selectAndSetWallpaper() {
@@ -152,6 +160,13 @@ public class Main {
         int result = chooser.showOpenDialog(null);
         if (result == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
+
+            long maxFileSize = 300L * 1024 * 1024; // 300MB byte max
+            if (file.length() > maxFileSize) {
+                JOptionPane.showMessageDialog(null, "File size exceeds 300MB limit.", "File Too Large", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             String path = file.getAbsolutePath().toLowerCase();
 
             saveConfig(file.getAbsolutePath(), file.getParent());
@@ -168,23 +183,35 @@ public class Main {
         }
     }
 
+
     private static void setImageWallpaper(File file) {
         removeVideoPanel();
-        ImageIcon icon = new ImageIcon(file.getAbsolutePath());
-        Image scaledImage = icon.getImage().getScaledInstance(wallpaperFrame.getWidth(), wallpaperFrame.getHeight(), Image.SCALE_SMOOTH);
-        imageLabel.setIcon(new ImageIcon(scaledImage));
+        if (coverMode) {
+            scaleAndSetImage(file);
+        } else {
+            ImageIcon icon = new ImageIcon(file.getAbsolutePath());
+            imageLabel.setIcon(icon);
+            imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            imageLabel.setVerticalAlignment(SwingConstants.CENTER);
+        }
     }
+
 
     private static void setGifWallpaper(File file) {
         removeVideoPanel();
         ImageIcon icon = new ImageIcon(file.getAbsolutePath());
         imageLabel.setIcon(icon);
+        imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        imageLabel.setVerticalAlignment(SwingConstants.CENTER);
     }
 
+
     private static void setVideoWallpaper(File file) {
+        removeVideoPanel();
         wallpaperPanel.remove(imageLabel);
         wallpaperPanel.add(videoPanel, BorderLayout.CENTER);
         wallpaperPanel.revalidate();
+        wallpaperPanel.repaint();
 
         new Thread(() -> Platform.runLater(() -> {
             try {
@@ -195,18 +222,39 @@ public class Main {
                 MediaView mediaView = new MediaView(mediaPlayer);
                 mediaView.setPreserveRatio(true);
 
-                mediaPlayer.setOnReady(() -> {
-                    mediaView.fitWidthProperty().bind(videoPanel.getScene().widthProperty());
-                    mediaView.fitHeightProperty().bind(videoPanel.getScene().heightProperty());
+                Group root = new Group(mediaView);
+                Scene scene = new Scene(root);
+
+                videoPanel.setScene(scene);
+
+                videoPanel.addComponentListener(new java.awt.event.ComponentAdapter() {
+                    @Override
+                    public void componentResized(java.awt.event.ComponentEvent e) {
+                        Platform.runLater(() -> {
+                            int width = videoPanel.getWidth();
+                            int height = videoPanel.getHeight();
+                            if (coverMode) {
+                                mediaView.setFitWidth(width);
+                                mediaView.setFitHeight(height);
+                                mediaView.setPreserveRatio(true);
+                            } else {
+                                mediaView.setFitWidth(media.getWidth());
+                                mediaView.setFitHeight(media.getHeight());
+                                mediaView.setPreserveRatio(false);
+                            }
+                        });
+                    }
                 });
 
+
                 mediaPlayer.play();
-                videoPanel.setScene(new Scene(new Group(mediaView)));
             } catch (Exception ex) {
                 ex.printStackTrace();
+                JOptionPane.showMessageDialog(null, "Failed to load video: " + ex.getMessage());
             }
         })).start();
     }
+
 
     private static void removeVideoPanel() {
         Platform.runLater(() -> videoPanel.setScene(null));
@@ -237,14 +285,44 @@ public class Main {
             throw new RuntimeException(e);
         }
     }
-    
+
     private static void setPurpleBackground() {
         removeVideoPanel();
         BufferedImage image = new BufferedImage(1920, 1080, BufferedImage.TYPE_INT_RGB);
         Graphics2D g2d = image.createGraphics();
-        g2d.setPaint(new Color(128, 0, 128)); // Purple
+        g2d.setPaint(new Color(128, 0, 128));
         g2d.fillRect(0, 0, image.getWidth(), image.getHeight());
         g2d.dispose();
         imageLabel.setIcon(new ImageIcon(image));
     }
+
+    private static void scaleAndSetImage(File file) {
+        try {
+            BufferedImage img = ImageIO.read(file);
+            int screenWidth = wallpaperFrame.getWidth();
+            int screenHeight = wallpaperFrame.getHeight();
+
+            double imgAspect = (double) img.getWidth() / img.getHeight();
+            double screenAspect = (double) screenWidth / screenHeight;
+
+            int newWidth, newHeight;
+
+            if (imgAspect > screenAspect) {
+                newHeight = screenHeight;
+                newWidth = (int) (screenHeight * imgAspect);
+            } else {
+                newWidth = screenWidth;
+                newHeight = (int) (screenWidth / imgAspect);
+            }
+
+            Image scaledImage = img.getScaledInstance(newWidth, newHeight, Image.SCALE_SMOOTH);
+            ImageIcon icon = new ImageIcon(scaledImage);
+            imageLabel.setIcon(icon);
+            imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            imageLabel.setVerticalAlignment(SwingConstants.CENTER);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 }

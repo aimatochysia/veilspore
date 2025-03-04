@@ -1,0 +1,1 @@
+jpackage --name veilspore  --input "C:\Assignments\Coding\Java\veilspore\veilspore\out\artifacts\veilspore_jar"   --main-jar veilspore.jar  --main-class Main  --icon "C:\Assignments\Coding\Java\veilspore\icon.ico"   --type exe  --win-shortcut   --win-menu   --java-options "--enable-preview"   --output "C:\Assignments\Coding\Java\veilspore\dist"

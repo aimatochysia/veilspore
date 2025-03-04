@@ -1,0 +1,18 @@
+
+
+Version:	3.50
+CmdLine:	C:\Assignments\Coding\Java\veilspore\dist\veilspore.exe --l4j-debug
+JNI:		No
+WOW64:		Yes
+Working dir:	C:\Assignments\Coding\Java\veilspore\dist\.
+Requires JDK:	No
+Requires 64-Bit: No
+Java min ver:	
+Java max ver:	
+JRE paths:	C:\Assignments\Coding\Java\veilspore\dist\jre\jdk-21
+Check launcher:	C:\Assignments\Coding\Java\veilspore\dist\jre\jdk-21\bin\javaw.exe (OK)
+Version string: 1.021.000_002 / 64-Bit (OK)
+Launcher:	C:\Assignments\Coding\Java\veilspore\dist\jre\jdk-21\bin\javaw.exe
+Launcher args:	-jar "C:\Assignments\Coding\Java\veilspore\dist\veilspore.exe"
+Args length:	62/32768 chars
+Exit code:	0
